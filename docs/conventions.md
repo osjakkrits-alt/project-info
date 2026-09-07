@@ -1,31 +1,121 @@
 # Conventions
 
-These defaults apply until a project adopts more specific standards.
+ข้อตกลงสำหรับการพัฒนา Project Information Lifecycle ด้วย TypeScript และ PostgreSQL ตาม [Architecture](architecture.md) เอกสารนี้กำหนดแนวทางก่อนเริ่ม implementation ส่วน Framework, runtime, ORM และเครื่องมือตรวจโค้ดยังไม่ได้เลือก
 
 ## General
 
-- Prefer clear, consistent names over abbreviations.
-- Keep modules and functions focused on one responsibility.
-- Document intent and constraints rather than restating implementation.
-- Avoid secrets, personal data, and environment-specific values in version control.
+- ใช้คำศัพท์ Customer, Contact, Opportunity, Stage และ Status ให้ตรงกับเอกสาร Sales
+- แบ่งหน้าที่ของหน้าจอ การรับคำขอ กติกาธุรกิจ และการเข้าถึงข้อมูลตาม Architecture
+- ให้แต่ละฟังก์ชันและโมดูลมีหน้าที่ชัดเจน ใช้ชื่อที่สื่อความหมายและหลีกเลี่ยงคำย่อที่ไม่จำเป็น
+- อธิบายเหตุผลหรือข้อจำกัดใน comment แทนการบรรยายสิ่งที่โค้ดทำอยู่แล้ว
+- เปลี่ยนเฉพาะส่วนที่เกี่ยวข้องกับงาน และอัปเดตเอกสารเมื่อกติกาหรือขอบเขตเปลี่ยน
 
 ## Files and formatting
 
-- Use UTF-8, final newlines, and the formatter selected by the project.
-- Use lowercase kebab-case for documentation file names unless an ecosystem requires otherwise.
-- Keep generated files separate and document how to reproduce them.
+- ใช้ UTF-8 มี newline ท้ายไฟล์ และไม่มีช่องว่างท้ายบรรทัด
+- ใช้ lowercase kebab-case สำหรับชื่อไฟล์และโฟลเดอร์ทั่วไป เช่น `customer-info.md` ยกเว้นชื่อที่ Framework กำหนด
+- ใช้ภาษาอังกฤษสำหรับชื่อในโค้ดและฐานข้อมูล เอกสารอธิบายใช้ภาษาไทยร่วมกับศัพท์ธุรกิจที่ตกลงกัน
+- เมื่อเลือก formatter แล้ว ให้ใช้ configuration กลางชุดเดียว ไม่จัดรูปแบบตามความชอบรายบุคคล
+- แยก generated files และระบุวิธีสร้างซ้ำ ไม่แก้ไฟล์ที่สร้างอัตโนมัติด้วยมือ
+
+## TypeScript
+
+- เปิด strict type checking เมื่อสร้างโครงการ
+- ใช้ `camelCase` สำหรับตัวแปรและฟังก์ชัน และ `PascalCase` สำหรับ type, interface และ class
+- ใช้ `unknown` สำหรับข้อมูลภายนอกที่ยังไม่ตรวจสอบ แล้วตรวจและแปลงเป็นชนิดข้อมูลที่ต้องการ หลีกเลี่ยง `any` และการข้ามข้อผิดพลาดของ type checker โดยไม่มีเหตุผล
+- ตรวจข้อมูลที่ Backend เสมอ TypeScript type เพียงอย่างเดียวไม่ใช่การตรวจข้อมูลขณะทำงาน
+- ระบุข้อมูลเข้าและผลลัพธ์ของขอบเขตโมดูลให้ชัดเจน ไม่ส่งรูปแบบข้อมูลจาก ORM ไปเป็นสัญญาของหน้าจอโดยอัตโนมัติ
+- แยกการอ่านเขียนฐานข้อมูลออกจากกติกาธุรกิจ และจัดการข้อผิดพลาดโดยไม่กลืนข้อผิดพลาดเงียบ ๆ
+- เลือกรูปแบบ import, module system และรายละเอียด lint หลังเลือก Framework และ runtime
+
+## PostgreSQL and data
+
+| เรื่อง | ข้อตกลงตั้งต้น |
+| --- | --- |
+| ชื่อตาราง | ภาษาอังกฤษ พหูพจน์แบบ `snake_case` เช่น `customers`, `opportunities` |
+| ชื่อคอลัมน์ | `snake_case` เช่น `customer_id`, `created_at` |
+| การอ้างอิง | ใช้ primary key และ foreign key ไม่ใช้ชื่อองค์กรเป็นตัวเชื่อมข้อมูล |
+| ชนิดรหัส | กำหนดใน database schema ก่อน implementation และใช้ให้สอดคล้องกัน |
+| ข้อมูลที่ไม่ทราบ | ใช้ `NULL` สำหรับข้อมูลเสริม ไม่ใช้ข้อความ “ยังไม่ทราบ” หรือศูนย์แทนข้อมูลที่ขาด หน้าจอเป็นผู้แสดงข้อความแทน |
+| วันและเวลาเหตุการณ์ | ใช้ `timestamptz` แลกเปลี่ยนเป็น ISO 8601 พร้อม timezone และแสดงตาม timezone ที่ระบบกำหนด |
+| วันที่อย่างเดียว | ใช้ `date` เช่น วันที่คาดว่าจะตัดสินใจ โดยไม่แปลงเป็นเวลาเที่ยงคืน |
+| จำนวนเงิน | ใช้ `numeric` พร้อมสกุลเงิน กำหนด precision/scale ใน schema และไม่คำนวณเงินด้วย floating point โดยตรง |
+| ประวัติ | มีผู้สร้าง/ผู้แก้ไขและเวลา เก็บประวัติการเปลี่ยนแปลงสำคัญแยกจากค่าปัจจุบัน |
+
+- เปลี่ยน schema ผ่าน migration ที่มีเวอร์ชันใน repository ไม่แก้ migration ที่ใช้งานร่วมกันแล้ว ให้เพิ่ม migration ใหม่
+- บังคับความสัมพันธ์และข้อจำกัดข้อมูลด้วย constraint ตาม schema ควบคู่กับการตรวจที่ Backend
+- บันทึกการเปลี่ยนข้อมูลและประวัติที่เกี่ยวข้องใน transaction เดียวกัน
+- ใช้ parameterized queries หรือกลไกเทียบเท่าจาก library ไม่ต่อค่าที่ผู้ใช้ส่งมาเป็น SQL
+- ป้องกันการแก้ข้อมูลเก่าทับข้อมูลใหม่ โดยกำหนดวิธีตรวจการแก้ไขพร้อมกันก่อน implementation ของการเปลี่ยนสถานะ
+- ไม่ลบ Customer หรือ Contact ที่มีงานอ้างอิง ใช้ Archived / Inactive ตามกติกา Customer Info
+- ใช้ข้อมูลสมมติสำหรับ seed และ tests ไม่ใช้ข้อมูลลูกค้าจริง
+
+## Customer and Sales rules
+
+- ใช้ [Customer Info](sales/customer-info.md) และ [Sales Status Flow](sales/sales-status-flow.md) เป็นแหล่งอ้างอิงกติกาธุรกิจ
+- เก็บ Stage และ Status แยกกันที่ Opportunity ไม่เก็บผลการขายเป็นสถานะของ Customer
+- ตรวจการเปลี่ยนขั้นตอนและสถานะผ่านกติกากลางใน Backend รวมถึงข้อมูลบังคับ เหตุผล และกิจกรรมถัดไป
+- บันทึกผู้เปลี่ยน เวลา ค่าก่อน/หลัง และเหตุผลเมื่อเปลี่ยน Stage / Status
+- Won ต้องอยู่ที่ Decision และมีหลักฐานตาม Sales Status Flow ไม่ถือว่าเริ่ม Delivery โดยอัตโนมัติ
+- เก็บค่ารหัสสถานะให้คงที่และแยกจากข้อความที่แสดงบนหน้าจอ รายการรหัสจริงจะกำหนดใน schema/API contract
+
+## Request handling and user interface
+
+- Backend ตรวจตัวตน สิทธิ์ และข้อมูลที่รับมา รวมถึงสิทธิ์ต่อรายการที่ถูกอ้างอิง ไม่อาศัยการซ่อนปุ่มบนหน้าจอ
+- ใช้ [User Management](access-control/user-management.md) และ [Roles and Permissions](access-control/roles-and-permissions.md) เป็นแหล่งอ้างอิงบัญชีผู้ใช้ บทบาท และขอบเขตข้อมูล
+- ส่งเฉพาะข้อมูลที่หน้าจอต้องใช้ ไม่คืนข้อมูลภายในหรือข้อมูลเชื่อมต่อฐานข้อมูล
+- ออกแบบข้อผิดพลาดให้แยกข้อมูลไม่ถูกต้อง ไม่มีสิทธิ์ ไม่พบรายการ และข้อมูลขัดแย้งได้ โดยกำหนดรูปแบบจริงเมื่อเลือก API style
+- รายการข้อมูลรองรับ pagination และการเรียงลำดับที่แน่นอน พร้อมจำกัดขนาดคำขอ
+- แบบฟอร์มระบุช่องบังคับ แสดงข้อผิดพลาดใกล้ช่องที่เกี่ยวข้อง และคงค่าที่ผู้ใช้กรอกเมื่อบันทึกไม่สำเร็จ
+- หน้าจอรองรับสถานะกำลังโหลด ไม่มีข้อมูล สำเร็จ และผิดพลาด ใช้งานด้วยแป้นพิมพ์ได้ และไม่ใช้สีเพียงอย่างเดียวสื่อสถานะ
+
+## Language and localization
+
+- เว็บรองรับภาษาไทย (`th`) และภาษาอังกฤษ (`en`) และมีตัวเลือกสลับภาษาที่เข้าถึงได้จากหน้าจอ
+- แยกข้อความที่ระบบแสดงเป็นชุดคำแปล ใช้ translation key ที่สื่อความหมาย เช่น `customer.form.name` ไม่ฝังข้อความไทยหรืออังกฤษโดยตรงใน component
+- ทุก key ต้องมีคำแปลครบทั้งสองภาษา ครอบคลุมเมนู ปุ่ม label, placeholder, validation, สถานะ loading/empty/error และข้อความสำหรับ screen reader
+- ใช้ประโยคเต็มพร้อมตัวแปรแทนการต่อข้อความทีละคำ เพื่อให้จัดลำดับคำได้ตามภาษา
+- เก็บรหัส Stage / Status และ error code ให้คงที่ Backend ส่งรหัสและพารามิเตอร์ที่จำเป็น ส่วนหน้าจอแสดงคำแปล ไม่ใช้ข้อความแปลเป็นค่าที่บันทึกหรือเงื่อนไขธุรกิจ
+- คงข้อมูลที่ผู้ใช้กรอกตามต้นฉบับ เช่น ชื่อองค์กร ชื่อบุคคล และหมายเหตุ การสลับภาษาเปลี่ยนเฉพาะข้อความระบบและรูปแบบการแสดงผล
+- จัดรูปแบบวันที่ ตัวเลข และเงินตาม locale ที่กำหนด โดยคงค่าข้อมูลเดิม สกุลเงินอิงรายการข้อมูล ไม่เปลี่ยนตามภาษาหน้าเว็บ
+- กำหนดรูปแบบปี พ.ศ./ค.ศ. และ locale สำหรับแสดงผลให้ชัดเจนก่อน implementation ภาษาไม่เปลี่ยน timezone ของข้อมูลโดยอัตโนมัติ
+- เมื่อสลับภาษา ให้คงหน้าปัจจุบันและข้อมูลแบบฟอร์มที่ยังไม่บันทึก พร้อมตั้งภาษาของหน้าให้ตรงกับภาษาที่แสดง
+- ตรวจ layout ทั้งสองภาษา รวมถึงข้อความยาว ฟอนต์ไทย และการตัดบรรทัด
+- ภาษาเริ่มต้น วิธีจดจำภาษาที่เลือก และภาษา fallback ยังรอตัดสินใจ หากคำแปลขาดให้ใช้ fallback ที่กำหนดและตรวจพบในการทดสอบ ไม่แสดง translation key ให้ผู้ใช้
+
+## Configuration and logging
+
+- เก็บ configuration ที่ต่างกันตาม environment แยกจากโค้ด และตรวจค่าที่จำเป็นเมื่อเริ่มแอป
+- ใช้ placeholder ใน `.env.example` ไม่ commit secrets, credentials, database dumps, เอกสารแนบ หรือข้อมูลลูกค้าจริง
+- บันทึก log เท่าที่จำเป็นต่อการตรวจปัญหา ไม่บันทึกรหัสผ่าน token หรือ request body ที่มีข้อมูลส่วนบุคคลทั้งชุด
+- แยก log สำหรับตรวจปัญหาออกจากประวัติธุรกิจที่ต้องเก็บในฐานข้อมูล
 
 ## Testing
 
-- Add or update tests for behavior changes.
-- Cover expected behavior, edge cases, and failure paths proportionate to risk.
-- Keep tests deterministic and independent of private local state.
+- เพิ่มหรือปรับ tests เมื่อพฤติกรรมเปลี่ยน โดยเน้นกติกาธุรกิจและเส้นทางผิดพลาดที่มีผลต่อข้อมูล
+- Unit tests: ตรวจเงื่อนไข Stage / Status เช่น Won ผิด Stage หรือไม่มีหลักฐาน และ On hold ไม่มีวันติดตาม
+- Integration tests: ตรวจความสัมพันธ์ใน PostgreSQL, transaction rollback และการบันทึกประวัติ ใช้ฐานข้อมูลทดสอบแยกจากข้อมูลใช้งาน
+- ทดสอบเส้นทางหลักตั้งแต่สร้าง Customer / Contact เปิด Opportunity จนถึงเปลี่ยนสถานะเมื่อมีหน้าจอและ Backend แล้ว
+- ตรวจ key คำแปลให้ครบทั้ง `th` และ `en` และทดสอบการสลับภาษา ข้อความผิดพลาด รูปแบบวันที่/เงิน และการคงข้อมูลที่ยังไม่บันทึก
+- ใช้ข้อมูลทดสอบที่ควบคุมได้และทำซ้ำได้ ไม่พึ่งข้อมูลส่วนตัวหรือข้อมูลบนเครื่องผู้พัฒนา
+- เมื่อมี toolchain ให้รัน formatting, lint, type checking, tests และ build ที่เกี่ยวข้อง พร้อมบันทึกคำสั่งใน repository
+- ปัจจุบันยังไม่มีเครื่องมือตรวจอัตโนมัติที่ตั้งค่าไว้ งานเอกสารให้ตรวจเนื้อหา ลิงก์ และ `git diff --check` พร้อมรายงานข้อจำกัด
 
 ## Git
 
-- Follow branch naming and Conventional Commit guidance in `docs/workflow.md`.
-- Keep commits scoped and avoid mixing unrelated formatting or refactoring.
+- รักษาลำดับ GitHub Issue / Sprint และ pull request ตาม [Development Workflow](workflow.md)
+- ใช้ชื่อ branch และ Conventional Commits ตามเอกสาร workflow
+- จำกัดแต่ละการเปลี่ยนแปลงให้มีขอบเขตชัดเจน ไม่รวมการจัดรูปแบบหรือ refactor ที่ไม่เกี่ยวข้อง
+- ระบุผล validation และรายการที่ข้ามหรือถูกบล็อกพร้อมเหตุผลในการส่งมอบ
+- สำหรับงานที่ทำผ่าน Codex ให้ commit, push หรือสร้าง pull request เมื่อผู้ใช้ร้องขออย่างชัดเจนตาม [Repository Instructions](../AGENTS.md)
 
-## Project-specific additions
+## Decisions still open
 
-Add language, API, database, accessibility, observability, and security conventions here once selected.
+- Framework, runtime, package manager และเวอร์ชัน
+- ORM / database library, formatter, linter และ test runner
+- โครงสร้างโฟลเดอร์ source code, API style และรูปแบบข้อผิดพลาด
+- Database schema, รหัส Stage / Status และวิธีตรวจการแก้ไขพร้อมกัน
+- วิธีเข้าสู่ระบบ การยืนยันขอบเขตสิทธิ์ตั้งต้นตามเอกสาร Access Control, timezone สำหรับแสดงผล และการติดตั้ง
+- Library คำแปล ภาษาเริ่มต้น ภาษา fallback วิธีจดจำภาษาที่เลือก และรูปแบบ locale/ปีสำหรับไทยและอังกฤษ
+
+อัปเดตเอกสารนี้พร้อม Architecture เมื่อมีข้อสรุป โดยยังไม่เพิ่ม dependencies จากรายการที่รอตัดสินใจ

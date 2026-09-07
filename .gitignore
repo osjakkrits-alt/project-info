@@ -33,3 +33,5 @@ out/
 
 # Local caches
 .cache/
+.pnpm-store/
+*.tsbuildinfo

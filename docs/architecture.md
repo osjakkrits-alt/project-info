@@ -1,28 +1,106 @@
 # Architecture
 
-Describe the system at a level that helps contributors make safe changes. Update this file when boundaries or major technical choices change.
+เอกสารสถาปัตยกรรมเบื้องต้นสำหรับ Project Information Lifecycle ระยะ POC ใช้กำหนดขอบเขตและแนวทางก่อนเริ่มพัฒนา ยังไม่มีการติดตั้งฐานข้อมูล เพิ่ม dependencies หรือสร้างโปรแกรมจากเอกสารนี้
 
 ## Context
 
-`<Who uses the system and what problem does it solve?>`
+ระบบจัดเก็บข้อมูลลูกค้าและติดตามโอกาสขายตาม [Project Information Lifecycle](project-information-lifecycle.md) เริ่มจาก [Customer Info](sales/customer-info.md) และ [Sales Status Flow](sales/sales-status-flow.md) โดยไม่มีการเชื่อมต่อระบบภายนอก
+
+สมมติฐานสำหรับออกแบบคือผู้ใช้ภายในทำงานผ่านเว็บเบราว์เซอร์ ส่วนจำนวนผู้ใช้และสถานที่ติดตั้งยังต้องกำหนดภายหลัง
+
+## Technical decisions
+
+| เรื่อง | แนวทาง | สถานะ |
+| --- | --- | --- |
+| ภาษา | TypeScript สำหรับ Frontend และ Backend | กำหนดแล้ว |
+| ภาษาหน้าเว็บ | รองรับภาษาไทย (`th`) และภาษาอังกฤษ (`en`) พร้อมการสลับภาษา | กำหนดแล้ว |
+| ฐานข้อมูล | PostgreSQL ตั้งแต่ POC | กำหนดแล้ว แทนข้อเสนอ SQLite ก่อนหน้า |
+| External integration | ไม่มีการเชื่อมต่อระบบอื่น | กำหนดแล้ว |
+| รูปแบบแอป | เว็บแอปเดียวที่แบ่งโมดูลภายใน (modular monolith) | แนวทางตั้งต้น |
+| Framework และ runtime | เลือกภายหลังตามแนวทางพัฒนาและติดตั้ง | ยังไม่กำหนด |
+| ORM / database library | เลือกภายหลัง โดย Prisma เป็นเพียงตัวเลือกที่เคยเสนอ | ยังไม่กำหนด |
+| Hosting และวิธีรัน PostgreSQL | กำหนดภายหลัง อาจรันเองหรือใช้บริการฐานข้อมูล | ยังไม่กำหนด |
+
+## Logical structure
+
+```text
+ผู้ใช้งานผ่านเว็บเบราว์เซอร์
+          |
+Frontend — TypeScript
+          |
+Backend — TypeScript
+  ├── รับคำขอและตรวจสิทธิ์
+  ├── Customer module
+  ├── Sales module
+  └── Data access
+          |
+      PostgreSQL
+```
+
+โครงสร้างนี้เป็นการแบ่งหน้าที่ ไม่ได้กำหนดให้ Frontend และ Backend เป็นคนละโปรเจกต์หรือคนละบริการ เบราว์เซอร์เข้าถึงข้อมูลผ่าน Backend เท่านั้น
 
 ## Components
 
 | Component | Responsibility | Dependencies |
 | --- | --- | --- |
-| `<name>` | `<purpose>` | `<dependencies>` |
+| Frontend | แสดงรายการ รายละเอียด แบบฟอร์ม และผลการทำงานให้ผู้ใช้ | Backend |
+| Backend / request handling | รับคำขอ ตรวจรูปแบบข้อมูลและสิทธิ์ แล้วเรียกโมดูลที่เกี่ยวข้อง | กลไกผู้ใช้และสิทธิ์, Customer / Sales modules |
+| Customer module | จัดการองค์กร ผู้ติดต่อ ผู้ดูแล และการเก็บข้อมูลเข้าคลัง | Data access |
+| Sales module | จัดการ Opportunity, Stage, Status, กิจกรรมถัดไป และเงื่อนไขการเปลี่ยนขั้นตอน | ข้อมูลอ้างอิงจาก Customer module, Data access |
+| Data access | อ่านเขียนข้อมูลและจัดการ transaction โดยแยกออกจากกติกาธุรกิจ | PostgreSQL |
+| PostgreSQL | เก็บข้อมูล ความสัมพันธ์ และประวัติการเปลี่ยนแปลง | พื้นที่จัดเก็บถาวร |
+
+โมดูลภายในเรียกใช้งานกันในแอปเดียว ไม่แยกเป็น microservices ในแนวทาง POC นี้ ส่วน Initiation & Analysis, Delivery และ Operation & MA เป็นขอบเขตที่จะออกแบบเพิ่มเติมในอนาคต
+
+## Users and access control
+
+POC ใช้แนวทาง Admin สร้างบัญชีผู้ใช้ภายใน ไม่มีการสมัครเองหรือเชื่อมระบบผู้ใช้ภายนอก ข้อมูลบัญชีเก็บใน PostgreSQL และมีสถานะ Active / Inactive ตาม [User Management](access-control/user-management.md)
+
+บทบาทตั้งต้นคือ Admin, Sales Manager, Sales และ Viewer โดยตรวจทั้งสิทธิ์ทำรายการและขอบเขตข้อมูลที่ Backend ตาม [Roles and Permissions](access-control/roles-and-permissions.md) วิธี authentication และ session ยังรอเลือกก่อน implementation
+
+## Web languages
+
+Frontend ใช้ชุดคำแปลภาษาไทยและอังกฤษแยกจากโค้ดหน้าจอ ครอบคลุมเมนู แบบฟอร์ม ข้อความสถานะ ข้อผิดพลาด และข้อความสำหรับการเข้าถึง โดยปฏิบัติตาม [Language and localization conventions](conventions.md#language-and-localization)
+
+Backend ส่งรหัสสถานะและรหัสข้อผิดพลาดที่ไม่ขึ้นกับภาษาให้หน้าจอเลือกแสดงคำแปล ข้อมูลที่ผู้ใช้กรอก เช่น ชื่อลูกค้าและหมายเหตุ คงภาษาต้นฉบับ ไม่แปลอัตโนมัติเมื่อสลับภาษา
+
+ภาษาเริ่มต้น วิธีจดจำภาษาที่เลือก และ library สำหรับคำแปลยังต้องกำหนดก่อน implementation
+
+## Data ownership
+
+| โมดูล / ส่วนกลาง | กลุ่มข้อมูลที่รับผิดชอบ |
+| --- | --- |
+| Customer | Customer, Contact และผู้ดูแลลูกค้า |
+| Sales | Opportunity, ความสัมพันธ์กับผู้ติดต่อและบทบาทในงาน, กิจกรรมติดตาม, Stage / Status history |
+| ข้อมูลผู้ใช้และสิทธิ์ | ตัวตนผู้ใช้งานและการอนุญาตให้ทำรายการ รายละเอียดกลไกยังไม่กำหนด |
+| ประวัติและเอกสารอ้างอิง | ผู้เปลี่ยน เวลา ค่าก่อน/หลัง เหตุผล และข้อมูลอ้างอิงเอกสารที่เกี่ยวข้อง |
+
+ลูกค้าหนึ่งรายมีหลาย Contact และหลาย Opportunity ได้ แต่ละ Opportunity มี Stage และ Status ของตนเอง โดยอ้างอิงข้อมูลด้วยรหัส รายละเอียดตาราง ชนิดข้อมูล และดัชนีจะออกแบบในขั้น database schema
+
+หาก POC รองรับการอัปโหลดไฟล์ ให้แยกเนื้อหาไฟล์ออกจากข้อมูลเชิงสัมพันธ์ และเก็บ metadata กับตำแหน่งอ้างอิงใน PostgreSQL วิธีเก็บไฟล์และขอบเขตการอัปโหลดยังไม่กำหนด
 
 ## Data and control flow
 
-`<Describe the primary request, event, or processing flow.>`
+1. ผู้ใช้ส่งข้อมูลจากหน้าจอ เช่น สร้างลูกค้าหรือเปลี่ยนสถานะ Opportunity
+2. Backend ตรวจรูปแบบข้อมูล ตัวตน และสิทธิ์ตามกลไกที่จะเลือก
+3. โมดูลที่เกี่ยวข้องตรวจเงื่อนไขธุรกิจ เช่น Won ต้องอยู่ที่ Decision และมีหลักฐานยอมรับข้อเสนอ
+4. Data access บันทึกการเปลี่ยนแปลงและประวัติที่เกี่ยวข้องใน transaction เดียวกัน
+5. Backend ส่งผลลัพธ์หรือข้อผิดพลาดที่เข้าใจได้กลับให้ Frontend
+
+กติกาธุรกิจต้องตรวจที่ Backend แม้ Frontend จะตรวจข้อมูลเบื้องต้นแล้ว การปิด Won บันทึกความพร้อมส่งต่อ Contract / SOW ตามเอกสาร Sales โดยยังไม่สร้างระบบขั้นตอนถัดไปโดยอัตโนมัติ
 
 ## Quality attributes
 
-- Security: `<requirements>`
-- Reliability: `<requirements>`
-- Performance: `<requirements>`
-- Maintainability: `<requirements>`
+- Security: ตรวจสิทธิ์ฝั่ง Backend เก็บข้อมูลเชื่อมต่อฐานข้อมูลนอก source code และไม่ใส่ข้อมูลลูกค้าจริงใน repository
+- Reliability: รักษาความสัมพันธ์ของข้อมูล บันทึกการเปลี่ยนแปลงพร้อมประวัติ และกำหนดวิธีสำรอง/กู้คืนก่อนใช้ข้อมูลที่ต้องเก็บรักษา
+- Performance: รายการข้อมูลต้องรองรับการแบ่งหน้าและการค้นหา ส่วนเป้าหมายปริมาณงานและเวลาตอบสนองกำหนดเมื่อทราบจำนวนผู้ใช้
+- Maintainability: แยกหน้าจอ กติกาธุรกิจ และการเข้าถึงข้อมูล จัดการการเปลี่ยน schema แบบมีเวอร์ชัน และทดสอบเงื่อนไขสำคัญของ Sales flow
 
 ## Constraints and open questions
 
-- `<constraint or unresolved architectural question>`
+- ขอบเขตปัจจุบันคือเอกสารออกแบบ ยังไม่กำหนดโครงสร้างโฟลเดอร์ source code หรือเริ่ม implementation
+- ต้องเลือก Framework, runtime, ORM / database library และเวอร์ชันก่อนเริ่มพัฒนา
+- ต้องกำหนดจำนวนผู้ใช้ วิธีเข้าสู่ระบบ และ session พร้อมยืนยันขอบเขตสิทธิ์ตั้งต้นในเอกสาร Access Control ก่อน implementation
+- ต้องเลือกสถานที่ติดตั้ง วิธีรัน PostgreSQL และวิธีสำรองข้อมูล ค่าใช้จ่าย hosting ยังไม่ได้ประเมิน
+- ต้องยืนยันว่า POC เก็บเพียงลิงก์เอกสารหรือรองรับการอัปโหลดไฟล์ด้วย
+- ต้องออกแบบ database schema และขอบเขตหน้าจอ/API ให้สอดคล้องกับเอกสาร Customer และ Sales ก่อนลงมือพัฒนา
